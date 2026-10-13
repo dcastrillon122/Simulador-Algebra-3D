@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Interactivo 3D | USM Arquitectura 2026</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cad: {
+                            900: '#0b0f19',
+                            800: '#111827',
+                            700: '#1f2937',
+                            600: '#374151',
+                            500: '#4b5563',
+                            accent: '#06b6d4',
+                            accentHover: '#0891b2',
+                            glow: 'rgba(6, 182, 212, 0.15)'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            touch-action: none;
+        }
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glow-accent {
+            box-shadow: 0 0 25px rgba(6, 182, 212, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-cad-900 text-gray-100 font-sans h-screen flex flex-col overflow-hidden select-none">
+
+    <header class="h-16 bg-cad-800 border-b border-gray-800 flex items-center justify-between px-4 lg:px-6 z-30 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <i data-lucide="box" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <h1 class="font-bold text-sm lg:text-base tracking-wide text-white">SIMULADOR ARQUITECTÓNICO 3D</h1>
+                    <span class="bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-[10px] px-2 py-0.5 rounded-full font-medium hidden sm:inline-block">USM 2026-II</span>
+                </div>
+                <p class="text-xs text-gray-400 hidden sm:block">Diana Erazo, Diego Castrillón y Equipo | Álgebra y Geometría Analítica</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2 sm:space-x-3">
+            <button id="btn-toggle-sidebar" class="lg:hidden p-2 rounded-lg bg-cad-700 hover:bg-cad-600 text-gray-200 transition">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+            <button id="btn-reset-cam" title="Reiniciar Cámara" class="flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-cad-700 hover:bg-cad-600 text-xs font-medium text-gray-200 transition">
+                <i data-lucide="rotate-ccw" class="w-4 h-4 text-cyan-400"></i>
+                <span class="hidden md:inline">Reset Vista</span>
+            </button>
+            <div class="flex bg-cad-700 rounded-lg p-0.5 border border-gray-700">
+                <button id="view-mode-solid" title="Modo Sólido" class="px-3 py-1.5 rounded-md text-xs font-medium bg-cyan-600 text-white shadow transition">Sólido</button>
+                <button id="view-mode-wire" title="Estructura Wireframe" class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-400 hover:text-white transition">Estructura</button>
+                <button id="view-mode-xray" title="Modo Rayos X / Transparente" class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-400 hover:text-white transition">Rayos X</button>
+            </div>
+            <button id="btn-report" class="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-xs font-semibold text-white shadow-md shadow-cyan-600/30 transition">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Reporte y Matemáticas</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex relative overflow-hidden">
+        
+        <aside id="sidebar" class="absolute lg:relative z-20 w-80 lg:w-96 h-full bg-cad-800/95 lg:bg-cad-800 border-r border-gray-800 flex flex-col transition-transform duration-300 transform -translate-x-full lg:translate-x-0 shadow-2xl lg:shadow-none">
+            
+            <div class="flex border-b border-gray-800 bg-cad-900/50 p-2 gap-1 shrink-0">
+                <button data-tab="params" class="tab-btn flex-1 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 bg-cad-700 text-cyan-400 transition">
+                    <i data-lucide="sliders" class="w-4 h-4"></i>
+                    <span>Parámetros</span>
+                </button>
+                <button data-tab="materials" class="tab-btn flex-1 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 text-gray-400 hover:text-white transition">
+                    <i data-lucide="palette" class="w-4 h-4"></i>
+                    <span>Materiales</span>
+                </button>
+                <button data-tab="quadratic" class="tab-btn flex-1 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 text-gray-400 hover:text-white transition">
+                    <i data-lucide="trending-up" class="w-4 h-4"></i>
+                    <span>Optimización</span>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-6">
+                
+                <!-- TAB 1: PARÁMETROS GEOMÉTRICOS Y ECONÓMICOS -->
+                <div id="tab-content-params" class="space-y-5">
+                    <div>
+                        <h2 class="text-xs font-bold tracking-wider text-cyan-400 uppercase mb-1 flex items-center space-x-1.5">
+                            <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
+                            <span>Dimensiones del Lote (a × l)</span>
+                        </h2>
+                        <p class="text-[11px] text-gray-400">Define la superficie inicial y área base (Ref: 10.80m × 22.40m).</p>
+                    </div>
+
+                    <!-- Ancho del Lote (a) -->
+                    <div class="space-y-1.5 bg-cad-900/60 p-3 rounded-xl border border-gray-800">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-300 font-medium">Ancho del Lote (a):</span>
+                            <span id="val-width" class="text-cyan-400 font-mono font-semibold">10.80 m</span>
+                        </div>
+                        <input type="range" id="input-width" min="4" max="50" step="0.20" value="10.80" class="w-full accent-cyan-500 cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                            <span>4.00 m</span>
+                            <span>50.00 m</span>
+                        </div>
+                    </div>
+
+                    <!-- Largo del Lote (l) -->
+                    <div class="space-y-1.5 bg-cad-900/60 p-3 rounded-xl border border-gray-800">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-300 font-medium">Largo del Lote (l):</span>
+                            <span id="val-length" class="text-cyan-400 font-mono font-semibold">22.40 m</span>
+                        </div>
+                        <input type="range" id="input-length" min="4" max="50" step="0.20" value="22.40" class="w-full accent-cyan-500 cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                            <span>4.00 m</span>
+                            <span>50.00 m</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <h2 class="text-xs font-bold tracking-wider text-cyan-400 uppercase mb-1 flex items-center space-x-1.5">
+                            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                            <span>Configuración Vertical (n, h)</span>
+                        </h2>
+                        <p class="text-[11px] text-gray-400">Número de niveles y altura de entrepiso (Con decimales exactos).</p>
+                    </div>
+
+                    <!-- Número de Pisos (n) -->
+                    <div class="space-y-1.5 bg-cad-900/60 p-3 rounded-xl border border-gray-800">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-300 font-medium">Número de Pisos (n):</span>
+                            <span id="val-floors" class="text-cyan-400 font-mono font-semibold">5 pisos</span>
+                        </div>
+                        <input type="range" id="input-floors" min="1" max="20" step="1" value="5" class="w-full accent-cyan-500 cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                            <span>1 piso</span>
+                            <span>20 pisos</span>
+                        </div>
+                    </div>
+
+                    <!-- Altura por Piso (h) -->
+                    <div class="space-y-1.5 bg-cad-900/60 p-3 rounded-xl border border-gray-800">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-300 font-medium">Altura por Piso (h):</span>
+                            <span id="val-floor-height" class="text-cyan-400 font-mono font-semibold">3.10 m</span>
+                        </div>
+                        <input type="range" id="input-floor-height" min="2.5" max="6.0" step="0.05" value="3.10" class="w-full accent-cyan-500 cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-gray-500 font-mono">
+                            <span>2.50 m</span>
+                            <span>6.00 m</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <h2 class="text-xs font-bold tracking-wider text-cyan-400 uppercase mb-1 flex items-center space-x-1.5">
+                            <i data-lucide="dollar-sign" class="w-3.5 h-3.5"></i>
+                            <span>Modelo Económico Lineal</span>
+                        </h2>
+                        <p class="text-[11px] text-gray-400">C = p · At + Cf (Costo estimado en tiempo real).</p>
+                    </div>
+
+                    <!-- Costo por m2 (p) -->
+                    <div class="space-y-1.5 bg-cad-900/60 p-3 rounded-xl border border-gray-800">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-300 font-medium">Costo por m² (p):</span>
+                            <span id="val-cost-m2" class="text-cyan-400 font-mono font-semibold">$1,200 USD</span>
+                        </div>
+                        <input type="range" id="input-cost-m2" min="500" max="3500" step="50" value="1200" class="w-full accent-cyan-500 cursor-pointer">
+                    </div>
+
+                    <!-- Costos Fijos (Cf) -->
+                    <div class="space-y-1.5 bg-cad-900/60 p-3 rounded-xl border border-gray-800">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-300 font-medium">Costos Fijos (Cf):</span>
+                            <span id="val-fixed-cost" class="text-cyan-400 font-mono font-semibold">$50,000 USD</span>
+                        </div>
+                        <input type="range" id="input-fixed-cost" min="10000" max="250000" step="5000" value="50000" class="w-full accent-cyan-500 cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- TAB 2: MATERIALES Y ACABADOS -->
+                <div id="tab-content-materials" class="space-y-5 hidden">
+                    <div>
+                        <h2 class="text-xs font-bold tracking-wider text-cyan-400 uppercase mb-1 flex items-center space-x-1.5">
+                            <i data-lucide="palette" class="w-3.5 h-3.5"></i>
+                            <span>Acabado de Fachada Global</span>
+                        </h2>
+                        <p class="text-[11px] text-gray-400">Selecciona el material arquitectónico para el renderizado 3D en tiempo real.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-2.5">
+                        <label class="material-option cursor-pointer flex items-center space-x-3 p-3 rounded-xl bg-cad-900/60 border border-cyan-500/50 hover:bg-cad-700/50 transition" data-material="concrete">
+                            <input type="radio" name="facade-mat" value="concrete" checked class="accent-cyan-500">
+                            <div class="w-6 h-6 rounded-lg bg-gray-500 shadow border border-gray-400"></div>
+                            <div>
+                                <p class="text-xs font-semibold text-white">Concreto Arquitectónico</p>
+                                <p class="text-[10px] text-gray-400">Textura industrial gris natural pulida</p>
+                            </div>
+                        </label>
+
+                        <label class="material-option cursor-pointer flex items-center space-x-3 p-3 rounded-xl bg-cad-900/60 border border-gray-800 hover:bg-cad-700/50 transition" data-material="glass">
+                            <input type="radio" name="facade-mat" value="glass" class="accent-cyan-500">
+                            <div class="w-6 h-6 rounded-lg bg-cyan-400/40 backdrop-blur shadow border border-cyan-300/50"></div>
+                            <div>
+                                <p class="text-xs font-semibold text-white">Vidrio Espejo Reflectivo</p>
+                                <p class="text-[10px] text-gray-400">Acristalamiento completo alta eficiencia</p>
+                            </div>
+                        </label>
+
+                        <label class="material-option cursor-pointer flex items-center space-x-3 p-3 rounded-xl bg-cad-900/60 border border-gray-800 hover:bg-cad-700/50 transition" data-material="marble">
+                            <input type="radio" name="facade-mat" value="marble" class="accent-cyan-500">
+                            <div class="w-6 h-6 rounded-lg bg-slate-100 shadow border border-slate-300"></div>
+                            <div>
+                                <p class="text-xs font-semibold text-white">Mármol Blanco Carrara</p>
+                                <p class="text-[10px] text-gray-400">Paneles pétreos de lujo institucional</p>
+                            </div>
+                        </label>
+
+                        <label class="material-option cursor-pointer flex items-center space-x-3 p-3 rounded-xl bg-cad-900/60 border border-gray-800 hover:bg-cad-700/50 transition" data-material="wood">
+                            <input type="radio" name="facade-mat" value="wood" class="accent-cyan-500">
+                            <div class="w-6 h-6 rounded-lg bg-amber-800 shadow border border-amber-700"></div>
+                            <div>
+                                <p class="text-xs font-semibold text-white">Madera Teca Bioclimática</p>
+                                <p class="text-[10px] text-gray-400">Louvers y celosías de control solar</p>
+                            </div>
+                        </label>
+
+                        <label class="material-option cursor-pointer flex items-center space-x-3 p-3 rounded-xl bg-cad-900/60 border border-gray-800 hover:bg-cad-700/50 transition" data-material="corten">
+                            <input type="radio" name="facade-mat" value="corten" class="accent-cyan-500">
+                            <div class="w-6 h-6 rounded-lg bg-orange-900 shadow border border-orange-700"></div>
+                            <div>
+                                <p class="text-xs font-semibold text-white">Acero Corten Oxidado</p>
+                                <p class="text-[10px] text-gray-400">Estética contemporánea expresiva</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="bg-cad-900/80 p-3 rounded-xl border border-gray-800 text-[11px] text-gray-400 space-y-1">
+                        <p class="font-semibold text-gray-300 flex items-center space-x-1">
+                            <i data-lucide="info" class="w-3.5 h-3.5 text-cyan-400"></i>
+                            <span>Interacción 3D por Nivel</span>
+                        </p>
+                        <p>Haz clic directamente sobre cualquier piso en el visor tridimensional para seleccionarlo y aislar su inspección estructural.</p>
+                    </div>
+                </div>
+
+                <!-- TAB 3: ECUACIÓN CUADRÁTICA Y OPTIMIZACIÓN -->
+                <div id="tab-content-quadratic" class="space-y-5 hidden">
+                    <div>
+                        <h2 class="text-xs font-bold tracking-wider text-cyan-400 uppercase mb-1 flex items-center space-x-1.5">
+                            <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+                            <span>Optimización con Ecuación Cuadrática</span>
+                        </h2>
+                        <p class="text-[11px] text-gray-400">Análisis paramétrico A(x) = -x² + b · x para maximización de superficie bajo restricciones de lote.</p>
+                    </div>
+
+                    <!-- Parámetro b (Longitud base disponible) -->
+                    <div class="space-y-1.5 bg-cad-900/60 p-3 rounded-xl border border-gray-800">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-300 font-medium">Perímetro / Longitud Base (b):</span>
+                            <span id="val-quad-b" class="text-cyan-400 font-mono font-semibold">33.20 m</span>
+                        </div>
+                        <input type="range" id="input-quad-b" min="15" max="60" step="0.5" value="33.20" class="w-full accent-cyan-500 cursor-pointer">
+                    </div>
+
+                    <!-- Variable x (Dimensión de prueba) -->
+                    <div class="space-y-1.5 bg-cad-900/60 p-3 rounded-xl border border-gray-800">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-gray-300 font-medium">Dimensión Variable (x):</span>
+                            <span id="val-quad-x" class="text-cyan-400 font-mono font-semibold">10.80 m</span>
+                        </div>
+                        <input type="range" id="input-quad-x" min="1" max="30" step="0.1" value="10.80" class="w-full accent-cyan-500 cursor-pointer">
+                    </div>
+
+                    <!-- Resultados de la Optimización -->
+                    <div class="bg-cad-900 p-4 rounded-xl border border-cyan-500/30 space-y-3">
+                        <h3 class="text-xs font-bold text-white flex items-center justify-between">
+                            <span>Métricas del Modelo Cuadrático</span>
+                            <span class="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded">Exacto</span>
+                        </h3>
+                        
+                        <div class="space-y-2 text-xs font-mono">
+                            <div class="flex justify-between border-b border-gray-800 pb-1.5">
+                                <span class="text-gray-400 font-sans">Área Actual A(x):</span>
+                                <span id="quad-result-area" class="text-cyan-400 font-bold">241.92 m²</span>
+                            </div>
+                            <div class="flex justify-between border-b border-gray-800 pb-1.5">
+                                <span class="text-gray-400 font-sans">Área Máxima A_max:</span>
+                                <span id="quad-result-max" class="text-emerald-400 font-bold">275.56 m²</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-400 font-sans">Valor óptimo de x (b/2):</span>
+                                <span id="quad-result-optx" class="text-amber-400 font-bold">16.60 m</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-2 text-[11px] text-gray-400 leading-relaxed">
+                            <p>Demuestra matemáticamente que el rectángulo de mayor área con un perímetro fijo se obtiene cuando la geometría tiende a la simetría óptima.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="p-3 bg-cad-900 border-t border-gray-800 text-center text-[10px] text-gray-500 shrink-0">
+                <p>Institución Universitaria de Santa Marta (USM)</p>
+                <p class="text-gray-400 font-medium">Diseño Computacional y Simulación Arquitectónica</p>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col relative bg-cad-900">
+            
+            <div id="canvas-container">
+                <div class="absolute top-4 left-4 z-10 hidden sm:flex items-center space-x-2 bg-cad-800/90 backdrop-blur border border-gray-700/80 px-3.5 py-2 rounded-xl shadow-lg">
+                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span class="text-xs font-semibold text-gray-200">Modelo 3D Paramétrico Activo</span>
+                    <span class="text-gray-500">|</span>
+                    <span id="selected-floor-badge" class="text-xs text-cyan-400 font-medium">Todos los pisos seleccionados</span>
+                </div>
+
+                <div class="absolute top-4 right-4 z-10 hidden md:flex items-center space-x-2 bg-cad-800/90 backdrop-blur border border-gray-700/80 px-3.5 py-2 rounded-xl shadow-lg text-xs text-gray-300">
+                    <i data-lucide="move" class="w-4 h-4 text-cyan-400"></i>
+                    <span>Orbitar: Clic izq + Arrastrar | Zoom: Rueda | Pan: Clic der</span>
+                </div>
+            </div>
+
+            <div class="absolute bottom-4 left-4 right-4 z-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pointer-events-auto">
+                
+                <div class="glass-panel p-3 rounded-xl border border-gray-700/60 shadow-xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-gray-400 text-[11px]">
+                        <span>Área Lote (Al)</span>
+                        <i data-lucide="maximize" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    </div>
+                    <p id="metric-lot-area" class="text-sm lg:text-base font-bold font-mono text-white mt-1">241.92 m²</p>
+                </div>
+
+                <div class="glass-panel p-3 rounded-xl border border-gray-700/60 shadow-xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-gray-400 text-[11px]">
+                        <span>Área Total (At)</span>
+                        <i data-lucide="grid" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    </div>
+                    <p id="metric-total-area" class="text-sm lg:text-base font-bold font-mono text-white mt-1">1,209.60 m²</p>
+                </div>
+
+                <div class="glass-panel p-3 rounded-xl border border-gray-700/60 shadow-xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-gray-400 text-[11px]">
+                        <span>Altura Total (Ht)</span>
+                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    </div>
+                    <p id="metric-height" class="text-sm lg:text-base font-bold font-mono text-white mt-1">15.50 m</p>
+                </div>
+
+                <div class="glass-panel p-3 rounded-xl border border-gray-700/60 shadow-xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between text-gray-400 text-[11px]">
+                        <span>Volumen (V)</span>
+                        <i data-lucide="box" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    </div>
+                    <p id="metric-volume" class="text-sm lg:text-base font-bold font-mono text-white mt-1">3,749.76 m³</p>
+                </div>
+
+                <div class="glass-panel p-3 rounded-xl border border-gray-700/60 shadow-xl flex flex-col justify-between col-span-2 sm:col-span-2 lg:col-span-2 bg-gradient-to-br from-cad-800 to-cad-900 border-cyan-500/30">
+                    <div class="flex items-center justify-between text-cyan-300 text-[11px]">
+                        <span>Costo Estimado (C) [Eq. Lineal]</span>
+                        <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    </div>
+                    <p id="metric-cost" class="text-base lg:text-lg font-bold font-mono text-cyan-400 mt-1">$1,501,520 USD</p>
+                </div>
+
+            </div>
+
+        </main>
+
+    </div>
+
+    <div id="report-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-cad-800 border border-gray-700 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            <div class="p-4 lg:p-5 border-b border-gray-700 flex items-center justify-between bg-cad-900/60">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+                        <i data-lucide="file-text" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-sm lg:text-base text-white">Memoria de Cálculo y Modelo Matemático</h2>
+                        <p class="text-xs text-gray-400">Institución Universitaria de Santa Marta - Arquitectura 2026</p>
+                    </div>
+                </div>
+                <button id="btn-close-modal" class="p-2 rounded-lg hover:bg-cad-700 text-gray-400 hover:text-white transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-5 text-xs lg:text-sm text-gray-300 leading-relaxed">
+                
+                <div class="bg-cad-900/80 p-4 rounded-xl border border-gray-800 space-y-2">
+                    <h3 class="font-bold text-cyan-400 flex items-center space-x-2">
+                        <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                        <span>1. Operaciones con Números Decimales exactos</span>
+                    </h3>
+                    <p class="text-gray-300">
+                        Obligatorio para el cálculo riguroso de cotas, alturas de entrepiso y áreas volumétricas exactas.
+                    </p>
+                    <div class="bg-cad-800 p-3 rounded-lg font-mono text-cyan-300 text-xs space-y-1">
+                        <p>• Área del Lote (Al) = a × l = 10.80 m × 22.40 m = 241.92 m²</p>
+                        <p>• Altura Total (Ht) = n × h = 5 × 3.10 m = 15.50 m</p>
+                        <p>• Volumen (V) = Ap × Ht = 241.92 m² × 15.50 m = 3,749.76 m³</p>
+                    </div>
+                </div>
+
+                <div class="bg-cad-900/80 p-4 rounded-xl border border-gray-800 space-y-2">
+                    <h3 class="font-bold text-cyan-400 flex items-center space-x-2">
+                        <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                        <span>2. Ecuación Lineal para Costos Estimados</span>
+                    </h3>
+                    <p class="text-gray-300">
+                        Proyecta el costo de construcción en función directa del área construida total (At), el valor por metro cuadrado (p) y los costos fijos (Cf).
+                    </p>
+                    <div class="bg-cad-800 p-3 rounded-lg font-mono text-cyan-300 text-xs">
+                        <p>C = p · At + Cf</p>
+                        <p class="mt-1 text-gray-400">Donde At = a · l · n. Para p = $1,200 y Cf = $50,000, el costo total se actualiza instantáneamente en el panel interactivo.</p>
+                    </div>
+                </div>
+
+                <div class="bg-cad-900/80 p-4 rounded-xl border border-gray-800 space-y-2">
+                    <h3 class="font-bold text-cyan-400 flex items-center space-x-2">
+                        <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                        <span>3. Ecuación Cuadrática y Optimización de Lote</span>
+                    </h3>
+                    <p class="text-gray-300">
+                        Implementada para analizar el comportamiento y optimización de áreas rectangulares dadas ciertas restricciones perimetrales.
+                    </p>
+                    <div class="bg-cad-800 p-3 rounded-lg font-mono text-cyan-300 text-xs">
+                        <p>A(x) = -x² + b · x</p>
+                        <p class="mt-1 text-gray-400">El vértice de la parábola define el punto máximo cuando x = b / 2, logrando la máxima eficiencia de ocupación urbana.</p>
+                    </div>
+                </div>
+
+                <div class="bg-cad-900 p-4 rounded-xl border border-gray-800 text-xs text-gray-400 space-y-1">
+                    <p class="font-semibold text-white">Autores del Proyecto:</p>
+                    <p>Diana Carolina Erazo Calderon, Diego José Castrillón Polo, Alfred Smit Londoño Gómez, Andrés Camilo Acuña Varela, Laura Alejandra Diaz Carvajalino.</p>
+                    <p class="text-cyan-400 font-medium pt-1">Docente: Luis Mario Duarte Sánchez | USM 2026</p>
+                </div>
+
+            </div>
+
+            <div class="p-4 border-t border-gray-700 bg-cad-900/60 flex justify-end">
+                <button id="btn-close-modal-footer" class="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition shadow-lg shadow-cyan-600/30">
+                    Entendido y Continuar
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        const state = {
+            width: 10.80,
+            length: 22.40,
+            floors: 5,
+            floorHeight: 3.10,
+            costM2: 1200,
+            fixedCost: 50000,
+            material: 'concrete',
+            viewMode: 'solid',
+            selectedFloor: null,
+            quadB: 33.20,
+            quadX: 10.80
+        };
+
+        const elWidth = document.getElementById('input-width');
+        const elLength = document.getElementById('input-length');
+        const elFloors = document.getElementById('input-floors');
+        const elFloorHeight = document.getElementById('input-floor-height');
+        const elCostM2 = document.getElementById('input-cost-m2');
+        const elFixedCost = document.getElementById('input-fixed-cost');
+        
+        const valWidth = document.getElementById('val-width');
+        const valLength = document.getElementById('val-length');
+        const valFloors = document.getElementById('val-floors');
+        const valFloorHeight = document.getElementById('val-floor-height');
+        const valCostM2 = document.getElementById('val-cost-m2');
+        const valFixedCost = document.getElementById('val-fixed-cost');
+
+        const metricLotArea = document.getElementById('metric-lot-area');
+        const metricTotalArea = document.getElementById('metric-total-area');
+        const metricHeight = document.getElementById('metric-height');
+        const metricVolume = document.getElementById('metric-volume');
+        const metricCost = document.getElementById('metric-cost');
+        const selectedFloorBadge = document.getElementById('selected-floor-badge');
+
+        const elQuadB = document.getElementById('input-quad-b');
+        const elQuadX = document.getElementById('input-quad-x');
+        const valQuadB = document.getElementById('val-quad-b');
+        const valQuadX = document.getElementById('val-quad-x');
+        const quadResultArea = document.getElementById('quad-result-area');
+        const quadResultMax = document.getElementById('quad-result-max');
+        const quadResultOptX = document.getElementById('quad-result-optx');
+
+        let scene, camera, renderer, controls;
+        let buildingGroup;
+        let raycaster, mouse;
+        const floorMeshes = [];
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0b0f19);
+            scene.fog = new THREE.FogExp2(0x0b0f19, 0.015);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(35, 25, 40);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.01;
+            controls.minDistance = 10;
+            controls.maxDistance = 120;
+            controls.target.set(0, 7, 0);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            dirLight.position.set(30, 50, 30);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 150;
+            const d = 30;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            scene.add(dirLight);
+
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.4);
+            hemiLight.position.set(0, 50, 0);
+            scene.add(hemiLight);
+
+            const gridHelper = new THREE.GridHelper(100, 50, 0x06b6d4, 0x1f2937);
+            gridHelper.position.y = -0.01;
+            scene.add(gridHelper);
+
+            const groundGeo = new THREE.PlaneGeometry(200, 200);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -0.05;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            buildingGroup = new THREE.Group();
+            scene.add(buildingGroup);
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            window.addEventListener('resize', onWindowResize);
+
+            updateCalculationsAndModel();
+            animate();
+        }
+
+        function getMaterialForType(type, opacity = 1.0, wireframe = false) {
+            let color = 0x94a3b8;
+            let roughness = 0.3;
+            let metalness = 0.1;
+            let transparent = opacity < 1.0;
+
+            switch(type) {
+                case 'concrete':
+                    color = 0x64748b;
+                    roughness = 0.8;
+                    metalness = 0.1;
+                    break;
+                case 'glass':
+                    color = 0x38bdf8;
+                    roughness = 0.1;
+                    metalness = 0.9;
+                    transparent = true;
+                    opacity = opacity < 1.0 ? opacity : 0.45;
+                    break;
+                case 'marble':
+                    color = 0xf8fafc;
+                    roughness = 0.2;
+                    metalness = 0.05;
+                    break;
+                case 'wood':
+                    color = 0xb45309;
+                    roughness = 0.6;
+                    metalness = 0.1;
+                    break;
+                case 'corten':
+                    color = 0xc2410c;
+                    roughness = 0.7;
+                    metalness = 0.3;
+                    break;
+            }
+
+            return new THREE.MeshStandardMaterial({
+                color: color,
+                roughness: roughness,
+                metalness: metalness,
+                transparent: transparent,
+                opacity: opacity,
+                wireframe: wireframe,
+                side: THREE.DoubleSide
+            });
+        }
+
+        function buildBuilding() {
+            while(buildingGroup.children.length > 0){
+                const obj = buildingGroup.children[0];
+                buildingGroup.remove(obj);
+            }
+            floorMeshes.length = 0;
+
+            const w = state.width;
+            const l = state.length;
+            const n = state.floors;
+            const h = state.floorHeight;
+
+            let wireframe = state.viewMode === 'wire';
+            let opacity = state.viewMode === 'xray' ? 0.3 : 1.0;
+
+            const baseMat = getMaterialForType(state.material, opacity, wireframe);
+            const slabMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, wireframe: wireframe });
+            const columnMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, wireframe: wireframe });
+
+            const lotGeo = new THREE.BoxGeometry(w, 0.2, l);
+            const lotMesh = new THREE.Mesh(lotGeo, new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 }));
+            lotMesh.position.y = -0.1;
+            lotMesh.receiveShadow = true;
+            buildingGroup.add(lotMesh);
+
+            for (let i = 0; i < n; i++) {
+                const floorGroup = new THREE.Group();
+                floorGroup.userData = { floorIndex: i };
+
+                const yPos = i * h + h / 2;
+
+                const slabGeo = new THREE.BoxGeometry(w + 0.4, 0.25, l + 0.4);
+                const slab = new THREE.Mesh(slabGeo, slabMat);
+                slab.position.y = i * h;
+                slab.castShadow = true;
+                slab.receiveShadow = true;
+                slab.userData = { floorIndex: i };
+                floorGroup.add(slab);
+
+                const innerW = w - 0.6;
+                const innerL = l - 0.6;
+
+                let matToUse = baseMat;
+                if (state.selectedFloor !== null && state.selectedFloor !== i) {
+                    matToUse = getMaterialForType(state.material, 0.2, wireframe);
+                }
+
+                const facadeGeo = new THREE.BoxGeometry(innerW, h - 0.25, innerL);
+                const facade = new THREE.Mesh(facadeGeo, matToUse);
+                facade.position.y = yPos;
+                facade.castShadow = true;
+                facade.receiveShadow = true;
+                facade.userData = { floorIndex: i };
+                floorGroup.add(facade);
+
+                const colGeo = new THREE.BoxGeometry(0.4, h, 0.4);
+                const colOffsets = [
+                    [-w/2 + 0.2, -l/2 + 0.2],
+                    [w/2 - 0.2, -l/2 + 0.2],
+                    [-w/2 + 0.2, l/2 - 0.2],
+                    [w/2 - 0.2, l/2 - 0.2]
+                ];
+
+                colOffsets.forEach(([cx, cz]) => {
+                    const col = new THREE.Mesh(colGeo, columnMat);
+                    col.position.set(cx, yPos, cz);
+                    col.castShadow = true;
+                    col.receiveShadow = true;
+                    col.userData = { floorIndex: i };
+                    floorGroup.add(col);
+                });
+
+                buildingGroup.add(floorGroup);
+                floorMeshes.push(floorGroup);
+            }
+        }
+
+        function updateCalculationsAndModel() {
+            const w = state.width;
+            const l = state.length;
+            const n = state.floors;
+            const h = state.floorHeight;
+            const p = state.costM2;
+            const cf = state.fixedCost;
+
+            const lotArea = w * l;
+            const floorArea = lotArea;
+            const totalArea = floorArea * n;
+            const totalHeight = n * h;
+            const volume = floorArea * totalHeight;
+            const totalCost = p * totalArea + cf;
+
+            metricLotArea.textContent = lotArea.toFixed(2) + ' m²';
+            metricTotalArea.textContent = totalArea.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' m²';
+            metricHeight.textContent = totalHeight.toFixed(2) + ' m';
+            metricVolume.textContent = volume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' m³';
+            metricCost.textContent = '$' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD';
+
+            const quadB = state.quadB;
+            const quadX = state.quadX;
+            const quadArea = -Math.pow(quadX, 2) + quadB * quadX;
+            const optX = quadB / 2;
+            const maxArea = -Math.pow(optX, 2) + quadB * optX;
+
+            quadResultArea.textContent = quadArea.toFixed(2) + ' m²';
+            quadResultMax.textContent = maxArea.toFixed(2) + ' m²';
+            quadResultOptX.textContent = optX.toFixed(2) + ' m';
+
+            buildBuilding();
+        }
+
+        function onPointerDown(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(buildingGroup.children, true);
+
+            if (intersects.length > 0) {
+                let obj = intersects[0].object;
+                while (obj.parent && obj.parent !== buildingGroup) {
+                    obj = obj.parent;
+                }
+                if (obj.userData && obj.userData.floorIndex !== undefined) {
+                    const fIdx = obj.userData.floorIndex;
+                    if (state.selectedFloor === fIdx) {
+                        state.selectedFloor = null;
+                        selectedFloorBadge.textContent = "Todos los pisos seleccionados";
+                    } else {
+                        state.selectedFloor = fIdx;
+                        selectedFloorBadge.textContent = `Piso ${fIdx + 1} seleccionado`;
+                    }
+                    buildBuilding();
+                }
+            }
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        elWidth.addEventListener('input', (e) => {
+            state.width = parseFloat(e.target.value);
+            valWidth.textContent = state.width.toFixed(2) + ' m';
+            updateCalculationsAndModel();
+        });
+
+        elLength.addEventListener('input', (e) => {
+            state.length = parseFloat(e.target.value);
+            valLength.textContent = state.length.toFixed(2) + ' m';
+            updateCalculationsAndModel();
+        });
+
+        elFloors.addEventListener('input', (e) => {
+            state.floors = parseInt(e.target.value);
+            valFloors.textContent = state.floors + (state.floors === 1 ? ' piso' : ' pisos');
+            updateCalculationsAndModel();
+        });
+
+        elFloorHeight.addEventListener('input', (e) => {
+            state.floorHeight = parseFloat(e.target.value);
+            valFloorHeight.textContent = state.floorHeight.toFixed(2) + ' m';
+            updateCalculationsAndModel();
+        });
+
+        elCostM2.addEventListener('input', (e) => {
+            state.costM2 = parseFloat(e.target.value);
+            valCostM2.textContent = '$' + state.costM2.toLocaleString() + ' USD';
+            updateCalculationsAndModel();
+        });
+
+        elFixedCost.addEventListener('input', (e) => {
+            state.fixedCost = parseFloat(e.target.value);
+            valFixedCost.textContent = '$' + state.fixedCost.toLocaleString() + ' USD';
+            updateCalculationsAndModel();
+        });
+
+        elQuadB.addEventListener('input', (e) => {
+            state.quadB = parseFloat(e.target.value);
+            valQuadB.textContent = state.quadB.toFixed(2) + ' m';
+            elQuadX.max = state.quadB;
+            updateCalculationsAndModel();
+        });
+
+        elQuadX.addEventListener('input', (e) => {
+            state.quadX = parseFloat(e.target.value);
+            valQuadX.textContent = state.quadX.toFixed(2) + ' m';
+            updateCalculationsAndModel();
+        });
+
+        document.querySelectorAll('input[name="facade-mat"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                state.material = e.target.value;
+                document.querySelectorAll('.material-option').forEach(opt => {
+                    opt.classList.remove('border-cyan-500');
+                    opt.classList.add('border-gray-800');
+                });
+                e.target.closest('.material-option').classList.remove('border-gray-800');
+                e.target.closest('.material-option').classList.add('border-cyan-500');
+                buildBuilding();
+            });
+        });
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetTab = btn.getAttribute('data-tab');
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('bg-cad-700', 'text-cyan-400');
+                    b.classList.add('text-gray-400');
+                });
+                btn.classList.add('bg-cad-700', 'text-cyan-400');
+                btn.classList.remove('text-gray-400');
+
+                document.getElementById('tab-content-params').classList.add('hidden');
+                document.getElementById('tab-content-materials').classList.add('hidden');
+                document.getElementById('tab-content-quadratic').classList.add('hidden');
+
+                document.getElementById(`tab-content-${targetTab}`).classList.remove('hidden');
+            });
+        });
+
+        document.getElementById('view-mode-solid').addEventListener('click', () => {
+            state.viewMode = 'solid';
+            setActiveViewModeBtn('view-mode-solid');
+            buildBuilding();
+        });
+        document.getElementById('view-mode-wire').addEventListener('click', () => {
+            state.viewMode = 'wire';
+            setActiveViewModeBtn('view-mode-wire');
+            buildBuilding();
+        });
+        document.getElementById('view-mode-xray').addEventListener('click', () => {
+            state.viewMode = 'xray';
+            setActiveViewModeBtn('view-mode-xray');
+            buildBuilding();
+        });
+
+        function setActiveViewModeBtn(activeId) {
+            ['view-mode-solid', 'view-mode-wire', 'view-mode-xray'].forEach(id => {
+                const b = document.getElementById(id);
+                if (id === activeId) {
+                    b.className = 'px-3 py-1.5 rounded-md text-xs font-medium bg-cyan-600 text-white shadow transition';
+                } else {
+                    b.className = 'px-3 py-1.5 rounded-md text-xs font-medium text-gray-400 hover:text-white transition';
+                }
+            });
+        }
+
+        document.getElementById('btn-reset-cam').addEventListener('click', () => {
+            camera.position.set(35, 25, 40);
+            controls.target.set(0, 7, 0);
+            controls.update();
+            state.selectedFloor = null;
+            selectedFloorBadge.textContent = "Todos los pisos seleccionados";
+            buildBuilding();
+        });
+
+        const sidebar = document.getElementById('sidebar');
+        document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
+            sidebar.classList.toggle('-translate-x-full');
+        });
+
+        const reportModal = document.getElementById('report-modal');
+        document.getElementById('btn-report').addEventListener('click', () => {
+            reportModal.classList.remove('hidden');
+            reportModal.classList.add('flex');
+        });
+        document.getElementById('btn-close-modal').addEventListener('click', () => {
+            reportModal.classList.add('hidden');
+            reportModal.classList.remove('flex');
+        });
+        document.getElementById('btn-close-modal-footer').addEventListener('click', () => {
+            reportModal.classList.add('hidden');
+            reportModal.classList.remove('flex');
+        });
+
+        window.onload = function() {
+            init3D();
+        };
+    </script>
+</body>
+</html>
